@@ -4,9 +4,9 @@ echo "Prioritize the Omarchy package repository over Arch repositories"
 # custom repositories, and administrator options survive the migration.
 #
 # Stage the rewritten config as root inside /etc, a directory the unprivileged
-# desktop user cannot write to, so the path `sudo install` reopens cannot be
-# swapped between the check and the privileged write (TOCTOU). Staging on the
-# destination filesystem also keeps the final install an atomic replacement.
+# desktop user cannot write to, so the path cannot be swapped between the check
+# and the privileged write (TOCTOU). Staging on the destination filesystem lets
+# the final step rename it into place as a single atomic replacement.
 pacman_config=$(sudo mktemp /etc/pacman.conf.XXXXXX)
 trap 'sudo rm -f "$pacman_config"' EXIT
 
@@ -23,9 +23,12 @@ awk '
   END { printf "%s%s%s", prefix, omarchy, others }
 ' /etc/pacman.conf | sudo tee "$pacman_config" >/dev/null
 
-if ! cmp -s /etc/pacman.conf "$pacman_config"; then
+# Compare as root: the staged file is root-owned, so the desktop user cannot
+# read it to tell whether the ordering already matches.
+if ! sudo cmp -s /etc/pacman.conf "$pacman_config"; then
   sudo cp -a /etc/pacman.conf /etc/pacman.conf.bak
-  sudo install -m 644 -o root -g root "$pacman_config" /etc/pacman.conf
+  sudo chmod 644 "$pacman_config"
+  sudo mv -f "$pacman_config" /etc/pacman.conf
 fi
 
 # Refresh databases and upgrade against the new repository priority. Run this
