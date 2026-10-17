@@ -31,6 +31,11 @@ if ! sudo cmp -s /etc/pacman.conf "$pacman_config"; then
   sudo mv -f "$pacman_config" /etc/pacman.conf
 fi
 
+# Clean up before the upgrade: sudo can expire during it, and a cleanup that
+# fails in the EXIT trap would fail the migration after a successful upgrade.
+sudo rm -f "$pacman_config"
+trap - EXIT
+
 # Refresh databases and upgrade against the new repository priority. Run this
 # even when the config is already ordered so a failed upgrade can be retried.
 omarchy-update-system-pkgs
